@@ -23,6 +23,10 @@ class Device:
     def __init__(self, ip_string, network):
         """
         Initialize a network device.
+
+        Hint: Your receiving an "ip string", but that should become an IPAddress! (think: 'composition' in Object-oriented Programming)
+        
+        Hint 2: Your self.attribute for the ip_string should probably be ip_address, rather than ip_string.
         
         Args:
             ip_string (str): IP address for this device
@@ -33,8 +37,11 @@ class Device:
         >>> device = Device("192.168.1.1", net)
         >>> str(device.ip_address)
         '192.168.1.1'
+        >>> device.network is net
+        True
         """
-        pass
+        self.ip_address = IPAddress(ip_string)
+        self.network = network
     
     def receive_packet(self, packet):
         """
@@ -48,6 +55,7 @@ class Device:
             packet (Packet): The packet being received
         
         This is the base implementation. Subclasses override this method.
+        There is NOTHING more to do!
         """
         pass
     
@@ -64,4 +72,4 @@ class Device:
         >>> print(device)
         Device @ 192.168.1.1
         """
-        pass
+        return f'Device @ {self.ip_address}'

@@ -41,42 +41,50 @@ class Host(Device):
         >>> host.inbox
         []
         """
-        pass
+        super().__init__(ip_string, network)
+        self.inbox = []
+        self.sequence = 1
     
     def send_packet(self, destination_ip_string, payload):
-        """
-        Send a packet to a destination IP address.
+        """        
+        Creates a new packet using the destination IP string and payload
+        along with auto-incrementing sequence number, and returns it.
         
-        Creates a new packet with auto-incrementing sequence number,
-        looks up the destination device in the network, and delivers
-        the packet by calling the destination's receive_packet method.
+        The packet is returned for the network to deliver via routing.
         
         Args:
             destination_ip_string (str): Destination IP address
             payload (str): Message to send
+
+        Returns:
+            Packet: A Packet object with source=self, destination from string, 
+                   payload, and auto-incremented sequence number.
         
         >>> from network import Network
         >>> net = Network()
-        >>> host_a = Host("192.168.1.10", net)
-        >>> host_b = Host("192.168.1.20", net)
-        >>> net.register_device(host_a)
-        >>> net.register_device(host_b)
+        >>> host = Host("192.168.1.10", net)
         
-        >>> host_a.send_packet("192.168.1.20", "Hello!")
-        >>> len(host_b.inbox)
-        1
-        
-        >>> host_b.inbox[0].payload
+        >>> pkt1 = host.send_packet("192.168.1.20", "Hello!")
+        >>> pkt1.payload
         'Hello!'
         
-        >>> host_a.send_packet("192.168.1.20", "Second message")
-        >>> len(host_b.inbox)
+        >>> pkt1.sequence
+        1
+        
+        >>> pkt2 = host.send_packet("192.168.2.30", "Second message")
+        >>> pkt2.sequence
         2
         
-        >>> host_b.inbox[1].sequence
-        2
+        >>> pkt3 = host.send_packet("10.0.0.1", "Third")
+        >>> pkt3.sequence
+        3
         """
-        pass
+        new_packet = Packet(self.ip_address, IPAddress(destination_ip_string), payload, sequence=self.sequence)
+
+        self.sequence += 1
+        
+        return new_packet
+
     
     def receive_packet(self, packet):
         """
@@ -102,7 +110,7 @@ class Host(Device):
         >>> host.inbox[0].payload
         'Test message'
         """
-        pass
+        self.inbox.append(packet)
     
     def get_messages(self):
         """
@@ -115,23 +123,22 @@ class Host(Device):
         
         >>> from network import Network
         >>> net = Network()
-        >>> host_a = Host("192.168.1.10", net)
-        >>> host_b = Host("192.168.1.20", net)
-        >>> net.register_device(host_a)
-        >>> net.register_device(host_b)
+        >>> host = Host("192.168.1.10", net)
         
-        >>> host_a.send_packet("192.168.1.20", "First")
-        >>> host_a.send_packet("192.168.1.20", "Second")
-        >>> host_a.send_packet("192.168.1.20", "Third")
+        >>> src = IPAddress("192.168.1.20")
+        >>> dst = IPAddress("192.168.1.10")
+        >>> host.receive_packet(Packet(src, dst, "First"))
+        >>> host.receive_packet(Packet(src, dst, "Second"))
+        >>> host.receive_packet(Packet(src, dst, "Third"))
         
-        >>> host_b.get_messages()
+        >>> host.get_messages()
         ['First', 'Second', 'Third']
         
-        >>> host_c = Host("192.168.1.30", net)
-        >>> host_c.get_messages()
+        >>> host2 = Host("192.168.1.30", net)
+        >>> host2.get_messages()
         []
         """
-        pass
+        return [packet.payload for packet in self.inbox]
     
     def __str__(self):
         """
@@ -146,4 +153,4 @@ class Host(Device):
         >>> print(host)
         Host @ 192.168.1.10
         """
-        pass
+        return f'Host @ {self.ip_address}'

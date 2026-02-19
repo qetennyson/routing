@@ -29,7 +29,7 @@ class Network:
         >>> net.devices
         {}
         """
-        pass
+        self.devices = {}
     
     def register_device(self, device):
         """
@@ -52,7 +52,7 @@ class Network:
         >>> net.devices["192.168.1.10"] == host
         True
         """
-        pass
+        self.devices[str(device.ip_address)] = device
     
     def get_device(self, ip_string):
         """
@@ -92,7 +92,7 @@ class Network:
         >>> device is None
         True
         """
-        pass
+        return self.devices.get(ip_string)
     
     def __str__(self):
         """
@@ -110,4 +110,4 @@ class Network:
         >>> print(net)
         Network with 2 devices
         """
-        pass
+        return f'Network with {len(self.devices)} devices'
