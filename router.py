@@ -44,6 +44,28 @@ class Router(Device):
         self.ip_address = IPAddress(ip_string)
         self.network = network
         self.routing_table = {}
+
+    def _is_exact_route_host_match(self, route):
+        possible_host = self.routing_table.get(route)
+        if possible_host:
+            return possible_host
+        
+    def _is_prefix_route_host_match(self, packet):
+            destination_octets = packet.dest.get_octets()
+            last_octet_to_check = 2
+            while last_octet_to_check >= 0:
+                prefix = destination_octets[:last_octet_to_check]
+                prefix_as_string = '.'.join((str(octet) for octet in prefix))
+
+                possible_match = self.routing_table.get(prefix_as_string)
+                if not possible_match:
+                    last_octet_to_check -= 1
+                    continue
+                
+                else:
+                    return possible_match
+        
+
     
     def add_route(self, destination_ip, next_hop_device):
         """
@@ -175,25 +197,16 @@ class Router(Device):
         if packet.ttl == 0:
             return
         
-        possible_host = self.routing_table.get(str(packet.dest))
-        if possible_host:
-            possible_host.receive_packet(packet)
+        exact_host = self._is_exact_route_host_match(str(packet.dest))
+        if exact_host:
+            exact_host.receive_packet(packet)
             return
-
-        destination_octets = packet.dest.get_octets()
-        last_octet_to_check = 2
-        while last_octet_to_check >= 0:
-            prefix = destination_octets[:last_octet_to_check]
-            prefix_as_string = '.'.join((str(octet) for octet in prefix))
-
-            possible_match = self.routing_table.get(prefix_as_string)
-            if not possible_match:
-                last_octet_to_check -= 1
-                continue
             
-            else:
-                possible_match.recieve_packet(packet)
-        
+        prefix_host = self._is_prefix_route_host_match(packet)
+        if prefix_host:
+            prefix_host.receive_packet(packet)
+            return
+       
         default_route = self.routing_table.get('*')
         if default_route:
             default_route.receive_packet(packet)
