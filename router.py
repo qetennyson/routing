@@ -189,19 +189,17 @@ class Router(Device):
     
     def receive_packet(self, packet: Packet):
         """
-        NOTE: Comprehensive doctests for this method will be added once
-        Network class is implemented, as they require full routing setup.
+        Receive a packet and immediately forward it.
 
-        Receive a packet and forward it.
+        Routers don't keep packets; they forward them to the next hop using forward_packet()!
         
-        This overrides Device.receive_packet(). Routers don't keep packets;
-        they forward them to the next hop using forward_packet().
+        This overrides Device.receive_packet(). 
         
         Args:
             packet (Packet): The packet being received
         
         """
-        pass
+        self.forward_packet(packet)
     
     def forward_packet(self, packet):
         """

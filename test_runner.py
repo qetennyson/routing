@@ -66,11 +66,11 @@ def main():
             results.append((module_name, description, 0, 0, False))
             continue
         
-        passed = attempted - failed
+        passed = attempted - failed # type: ignore
         total_passed += passed
         total_failed += failed
         
-        if failed == 0 and attempted > 0:
+        if failed == 0 and attempted > 0: # type: ignore
             print(f"  [OK] All tests passed ({passed}/{attempted})")
             results.append((module_name, description, passed, attempted, True))
         elif attempted == 0:
