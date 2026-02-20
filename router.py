@@ -46,24 +46,109 @@ class Router(Device):
         self.routing_table = {}
 
     def _is_exact_route_host_match(self, route):
+        """
+        Check if there's an exact route match in the routing table.
+        
+        Args:
+            route (str): The destination IP string to look up exactly
+        
+        Returns:
+            Device: The next-hop device if exact match found, None otherwise
+        
+        >>> router = Router("192.168.1.1", None)
+        >>> class MockDevice:
+        ...     pass
+        >>> dev_a = MockDevice()
+        >>> dev_b = MockDevice()
+        
+        # Add exact routes
+        >>> router.add_route("192.168.2.20", dev_a)
+        >>> router.add_route("10.0.0.50", dev_b)
+        
+        # Test exact match found
+        >>> result = router._is_exact_route_host_match("192.168.2.20")
+        >>> result is dev_a
+        True
+        
+        >>> result = router._is_exact_route_host_match("10.0.0.50")
+        >>> result is dev_b
+        True
+        
+        # Test exact match not found
+        >>> result = router._is_exact_route_host_match("192.168.2.21")
+        >>> result is None
+        True
+        
+        >>> result = router._is_exact_route_host_match("8.8.8.8")
+        >>> result is None
+        True
+        """
         possible_host = self.routing_table.get(route)
         if possible_host:
             return possible_host
         
     def _is_prefix_route_host_match(self, packet):
-            destination_octets = packet.dest.get_octets()
-            last_octet_to_check = 2
-            while last_octet_to_check >= 0:
-                prefix = destination_octets[:last_octet_to_check]
-                prefix_as_string = '.'.join((str(octet) for octet in prefix))
+        """
+        Check for prefix matches in the routing table.
+        
+        Tries progressively shorter prefixes: 3 octets, 2 octets, 1 octet.
+        Returns the first matching device or None if no match found.
+        
+        Args:
+            packet (Packet): The packet whose destination IP will be checked
+        
+        Returns:
+            Device: The next-hop device if prefix match found, None otherwise
+        
+        >>> router = Router("192.168.1.1", None)
+        >>> class MockDevice:
+        ...     pass
+        >>> dev_3octet = MockDevice()
+        >>> dev_2octet = MockDevice()
+        >>> dev_1octet = MockDevice()
+        
+        # Add prefix routes
+        >>> router.add_route("10.0.1", dev_3octet)
+        >>> router.add_route("172.16", dev_2octet)
+        >>> router.add_route("192", dev_1octet)
+        
+        # Test 3-octet prefix match
+        >>> pkt1 = Packet(IPAddress("192.168.1.10"), IPAddress("10.0.1.50"), "test", ttl=5)
+        >>> result = router._is_prefix_route_host_match(pkt1)
+        >>> result is dev_3octet
+        True
+        
+        # Test 2-octet prefix match (when 3-octet doesn't exist)
+        >>> pkt2 = Packet(IPAddress("192.168.1.10"), IPAddress("172.16.50.100"), "test", ttl=5)
+        >>> result = router._is_prefix_route_host_match(pkt2)
+        >>> result is dev_2octet
+        True
+        
+        # Test 1-octet prefix match (when 3 and 2 octets don't exist)
+        >>> pkt3 = Packet(IPAddress("192.168.1.10"), IPAddress("192.0.0.1"), "test", ttl=5)
+        >>> result = router._is_prefix_route_host_match(pkt3)
+        >>> result is dev_1octet
+        True
+        
+        # Test no prefix match found
+        >>> pkt4 = Packet(IPAddress("192.168.1.10"), IPAddress("8.8.8.8"), "test", ttl=5)
+        >>> result = router._is_prefix_route_host_match(pkt4)
+        >>> result is None
+        True
+        """
+        destination_octets = packet.dest.get_octets()
+        last_octet_to_check = 3
+        while last_octet_to_check >= 0:
+            prefix = destination_octets[:last_octet_to_check]
+            prefix_as_string = '.'.join((str(octet) for octet in prefix))
 
-                possible_match = self.routing_table.get(prefix_as_string)
-                if not possible_match:
-                    last_octet_to_check -= 1
-                    continue
-                
-                else:
-                    return possible_match
+            possible_match = self.routing_table.get(prefix_as_string)
+            if not possible_match:
+                last_octet_to_check -= 1
+                continue
+            
+            else:
+                return possible_match
         
 
     
