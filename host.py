@@ -45,7 +45,7 @@ class Host(Device):
         self.inbox = []
         self.sequence = 1
     
-    def send_packet(self, destination_ip_string, payload):
+    def create_packet(self, destination_ip_string, payload):
         """        
         Creates a new packet using the destination IP string and payload
         along with auto-incrementing sequence number, and returns it.
@@ -82,7 +82,7 @@ class Host(Device):
         new_packet = Packet(self.ip_address, IPAddress(destination_ip_string), payload, sequence=self.sequence)
 
         self.sequence += 1
-        
+
         return new_packet
 
     

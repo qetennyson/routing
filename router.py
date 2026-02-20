@@ -4,7 +4,7 @@ Router class for forwarding packets between networks.
 Routers use routing tables to determine where to send packets based
 on their destination IP addresses. They handle TTL and drop expired packets.
 """
-
+from simple_device import SimpleDevice # testing purposes only.
 from device import Device
 from packet import Packet
 from ip_address import IPAddress
@@ -80,7 +80,7 @@ class Router(Device):
         """
         self.routing_table[destination_ip] = next_hop_device
     
-    def receive_packet(self, packet):
+    def receive_packet(self, packet: Packet):
         """
         NOTE: Comprehensive doctests for this method will be added once
         Network class is implemented, as they require full routing setup.
@@ -100,10 +100,6 @@ class Router(Device):
         """
         Forward a packet to the next hop based on routing table.
 
-        NOTE: Comprehensive doctests for this method will be added once
-        Network class is implemented, as they require realistic packet routing.
-        See example_simulation.py for integration testing once complete.
-        
         LOOKUP ORDER (important for routing):
         1. Check for exact IP match: "192.168.2.20"
         2. Check for prefix matches: "192.168.2", "192.168", "192"
@@ -111,15 +107,99 @@ class Router(Device):
         4. If no match, drop the packet
         
         Before forwarding:
-        - Decrement the packet's TTL
+        - Decrement the packet's TTL by 1
         - If TTL reaches 0, drop the packet (don't forward)
         
         Args:
             packet (Packet): The packet to forward
         
-
+        ALGORITHM:
+        1. Decrement TTL first
+        2. Check if TTL is now 0 - if so, return (drop packet)
+        3. Try to find a route for the destination IP:
+           - First check exact IP match in routing_table
+           - If not found, try progressively shorter prefixes
+           - If still not found, check for default route "*"
+        4. If route found, call next_hop_device.receive_packet(packet)
+        
+        >>> router = Router("192.168.1.1", None)
+        >>> dev_b = SimpleDevice()
+        >>> router.add_route("192.168.2.20", dev_b)
+        >>> pkt = Packet(IPAddress("192.168.1.10"), IPAddress("192.168.2.20"), "test", ttl=5)
+        >>> router.forward_packet(pkt)
+        >>> len(dev_b.inbox)
+        1
+        >>> pkt.ttl
+        4
+        
+        # Test prefix matching
+        >>> router2 = Router("10.0.0.1", None)
+        >>> dev_c = SimpleDevice()
+        >>> router2.add_route("10.0.1", dev_c)
+        >>> pkt2 = Packet(IPAddress("192.168.1.10"), IPAddress("10.0.1.50"), "prefix match", ttl=5)
+        >>> router2.forward_packet(pkt2)
+        >>> len(dev_c.inbox)
+        1
+        
+        # Test TTL expiration (packet should be dropped)
+        >>> router3 = Router("172.16.0.1", None)
+        >>> dev_d = SimpleDevice()
+        >>> router3.add_route("192.168.2.20", dev_d)
+        >>> pkt3 = Packet(IPAddress("192.168.1.10"), IPAddress("192.168.2.20"), "will expire", ttl=1)
+        >>> initial_count = len(dev_d.inbox)
+        >>> router3.forward_packet(pkt3)
+        >>> len(dev_d.inbox) == initial_count
+        True
+        >>> pkt3.ttl
+        0
+        
+        # Test default route
+        >>> router4 = Router("1.1.1.1", None)
+        >>> default_dev = SimpleDevice()
+        >>> router4.add_route("*", default_dev)
+        >>> pkt4 = Packet(IPAddress("192.168.1.10"), IPAddress("8.8.8.8"), "default route", ttl=5)
+        >>> router4.forward_packet(pkt4)
+        >>> len(default_dev.inbox)
+        1
+        
+        # Test no route (packet dropped)
+        >>> router5 = Router("1.1.1.1", None)
+        >>> dev_e = SimpleDevice()
+        >>> router5.add_route("192.168.0", dev_e)
+        >>> pkt5 = Packet(IPAddress("10.0.0.1"), IPAddress("8.8.8.8"), "no route", ttl=5)
+        >>> router5.forward_packet(pkt5)
+        >>> len(dev_e.inbox)
+        0
         """
-        pass
+        packet.ttl -= 1
+        if packet.ttl == 0:
+            return
+        
+        possible_host = self.routing_table.get(str(packet.dest))
+        if possible_host:
+            possible_host.receive_packet(packet)
+            return
+
+        destination_octets = packet.dest.get_octets()
+        last_octet_to_check = 2
+        while last_octet_to_check >= 0:
+            prefix = destination_octets[:last_octet_to_check]
+            prefix_as_string = '.'.join((str(octet) for octet in prefix))
+
+            possible_match = self.routing_table.get(prefix_as_string)
+            if not possible_match:
+                last_octet_to_check -= 1
+                continue
+            
+            else:
+                possible_match.recieve_packet(packet)
+        
+        default_route = self.routing_table.get('*')
+        if default_route:
+            default_route.receive_packet(packet)
+
+        
+
     
     def __str__(self):
         """
