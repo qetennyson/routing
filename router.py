@@ -282,17 +282,17 @@ class Router(Device):
         
         exact_host = self._is_exact_route_host_match(str(packet.dest))
         if exact_host:
-            exact_host.receive_packet(packet)
+            self.network.deliver_packet(packet, str(exact_host.ip_address))
             return
             
         prefix_host = self._is_prefix_route_host_match(packet)
         if prefix_host:
-            prefix_host.receive_packet(packet)
+            self.network.deliver_packet(packet, str(prefix_host.ip_address))
             return
        
         default_route = self.routing_table.get('*')
         if default_route:
-            default_route.receive_packet(packet)
+            self.network.deliver_packet(packet, str(default_route.ip_address))
 
         
 

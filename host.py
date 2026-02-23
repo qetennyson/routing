@@ -21,16 +21,20 @@ class Host(Device):
     - Automatically manage sequence numbers for sent packets
     """
     
-    def __init__(self, ip_string, network):
+    def __init__(self, ip_string, network, gateway=None):
         """
         Initialize a host device.
         
         The host maintains an inbox (list) for received packets and
         a sequence counter that starts at 1 and auto-increments.
         
+        The gateway is the default router IP that this host sends packets
+        to when communicating with devices on different networks.
+        
         Args:
             ip_string (str): IP address for this host
             network (Network): The network this host belongs to
+            gateway (str): Optional default gateway IP address (router)
         
         >>> from network import Network
         >>> net = Network()
@@ -40,10 +44,18 @@ class Host(Device):
         
         >>> host.inbox
         []
+        
+        >>> host.gateway is None
+        True
+        
+        >>> host2 = Host("192.168.1.20", net, gateway="192.168.1.1")
+        >>> host2.gateway
+        '192.168.1.1'
         """
         super().__init__(ip_string, network)
         self.inbox = []
         self.sequence = 1
+        self.gateway = gateway
     
     def create_packet(self, destination_ip_string, payload):
         """        
@@ -84,6 +96,69 @@ class Host(Device):
         self.sequence += 1
 
         return new_packet
+    
+    def send_packet(self, destination_ip_string, payload):
+        """
+        Send a packet to a destination through the network.
+        
+        KEY NETWORKING CONCEPT:
+        The packet's destination IP is the FINAL destination, but the
+        host must determine the NEXT HOP for physical delivery:
+        - Same network (/24) -> send directly to destination
+        - Different network -> send to gateway (router)
+        
+        Steps:
+        1. Create packet using create_packet()
+        2. Determine next hop using _determine_next_hop()
+        3. Ask network to deliver to next hop (not destination!)
+        4. Return the packet (for testing)
+        
+        Args:
+            destination_ip_string (str): Final destination IP address
+            payload (str): Message to send
+        
+        Returns:
+            Packet: The created packet
+        
+        >>> from network import Network
+        >>> from router import Router
+        >>> net = Network()
+        >>> router = Router(\"192.168.1.1\", net)
+        >>> host_a = Host(\"192.168.1.10\", net, gateway=\"192.168.1.1\")
+        >>> host_b = Host(\"192.168.1.20\", net, gateway=\"192.168.1.1\")
+        >>> host_c = Host(\"192.168.2.20\", net, gateway=\"192.168.1.1\")
+        >>> net.register_device(router)
+        >>> net.register_device(host_a)
+        >>> net.register_device(host_b)
+        >>> net.register_device(host_c)
+        
+        # Test 1: Same network - direct delivery
+        >>> pkt1 = host_a.send_packet(\"192.168.1.20\", \"Direct message\")
+        >>> len(host_b.inbox)
+        1
+        >>> host_b.inbox[0].payload
+        'Direct message'
+        >>> pkt1.ttl
+        10
+        
+        # Test 2: Different network - via router
+        >>> router.add_route(\"192.168.2.20\", host_c)
+        >>> pkt2 = host_a.send_packet(\"192.168.2.20\", \"Via router\")
+        >>> len(host_c.inbox)
+        1
+        >>> host_c.inbox[0].payload
+        'Via router'
+        >>> pkt2.ttl
+        9
+        
+        # Test 3: No gateway - packet dropped
+        >>> host_d = Host(\"192.168.1.30\", net)
+        >>> net.register_device(host_d)
+        >>> pkt3 = host_d.send_packet(\"192.168.2.20\", \"No route\")
+        >>> len(host_c.inbox)
+        1
+        """
+        pass
 
     
     def receive_packet(self, packet):
@@ -139,6 +214,49 @@ class Host(Device):
         []
         """
         return [packet.payload for packet in self.inbox]
+    
+    def _determine_next_hop(self, destination_ip_string):
+        """
+        Determine the next hop IP address for a destination.
+        
+        This is a key networking concept: hosts make basic routing decisions.
+        
+        ROUTING LOGIC:
+        1. Check if destination is on the same network (use is_same_network)
+        2. If same network -> return destination IP (direct delivery)
+        3. If different network -> return gateway IP (send to router)
+        4. If no gateway configured -> return None (packet dropped)
+        
+        Args:
+            destination_ip_string (str): Final destination IP address
+        
+        Returns:
+            str: Next hop IP address, or None if no route available
+        
+        >>> from network import Network
+        >>> net = Network()
+        >>> host = Host("192.168.1.10", net, gateway="192.168.1.1")
+        
+        # Same network - direct delivery
+        >>> host._determine_next_hop("192.168.1.20")
+        '192.168.1.20'
+        
+        >>> host._determine_next_hop("192.168.1.100")
+        '192.168.1.100'
+        
+        # Different network - use gateway
+        >>> host._determine_next_hop("192.168.2.20")
+        '192.168.1.1'
+        
+        >>> host._determine_next_hop("10.0.0.1")
+        '192.168.1.1'
+        
+        # No gateway configured - no route
+        >>> host2 = Host("192.168.1.30", net)
+        >>> host2._determine_next_hop("192.168.2.20") is None
+        True
+        """        
+        pass
     
     def __str__(self):
         """

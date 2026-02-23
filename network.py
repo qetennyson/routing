@@ -94,23 +94,27 @@ class Network:
         """
         return self.devices.get(ip_string)
     
-    def deliver_packet(self, packet):
+    def deliver_packet(self, packet, next_hop_ip):
         """
-        Deliver a packet through the network to its destination.
+        Deliver a packet to the specified next hop device.
         
-        The network looks up the destination IP in the device registry
-        and delivers the packet by calling receive_packet() on that device.
-        If the destination is not in the registry, the packet is dropped.
+        KEY NETWORKING CONCEPT:
+        The network acts as the physical layer - it delivers packets to
+        the device you specify (next hop), NOT by reading packet headers.
         
-        This is the central coordination point: packets from hosts get routed
-        through routers via this method, which then uses the routing table.
+        - Packet destination (packet.dest) = final destination (never changes)
+        - Next hop (next_hop_ip parameter) = who receives it now (routing decision)
+        
+        This is how real Ethernet works: you specify the device to send to,
+        not by reading the packet's destination field.
         
         Args:
             packet (Packet): The packet to deliver
+            next_hop_ip (str): IP address of device to physically deliver to
         
         BEHAVIOR:
-        1. Look up the destination IP address in the network registry
-        2. If found, call receive_packet() on that device (Host or Router)
+        1. Look up next_hop_ip in the device registry
+        2. If found, call receive_packet() on that device
         3. If not found, packet is dropped (method returns silently)
         
         Test Case 1: Direct delivery from Host A to Host B
@@ -119,25 +123,27 @@ class Network:
         >>> from packet import Packet
         >>> from ip_address import IPAddress
         >>> net = Network()
-        >>> host_a = Host("192.168.1.10", net)
-        >>> host_b = Host("192.168.1.20", net)
+        >>> host_a = Host("192.168.1.10", net, gateway="192.168.1.1")
+        >>> host_b = Host("192.168.1.20", net, gateway="192.168.1.1")
         >>> net.register_device(host_a)
         >>> net.register_device(host_b)
         
-        >>> pkt1 = Packet(IPAddress("192.168.1.10"), IPAddress("192.168.1.20"), "Direct msg", ttl=5)
-        >>> net.deliver_packet(pkt1)
+        >>> pkt1 = Packet(IPAddress("192.168.1.10"), IPAddress("192.168.1.20"), "Direct", ttl=10)
+        >>> net.deliver_packet(pkt1, "192.168.1.20")
         >>> len(host_b.inbox)
         1
         >>> host_b.inbox[0].payload
-        'Direct msg'
+        'Direct'
+        >>> pkt1.ttl
+        10
         
         Test Case 2: Delivery through a router
         Host A -> Router -> Host B across network boundaries
         >>> from router import Router
         >>> net2 = Network()
-        >>> host_a2 = Host("192.168.1.10", net2)
+        >>> host_a2 = Host("192.168.1.10", net2, gateway="192.168.1.1")
         >>> router = Router("192.168.1.1", net2)
-        >>> host_b2 = Host("192.168.2.20", net2)
+        >>> host_b2 = Host("192.168.2.20", net2, gateway="192.168.1.1")
         >>> net2.register_device(host_a2)
         >>> net2.register_device(router)
         >>> net2.register_device(host_b2)
@@ -145,9 +151,9 @@ class Network:
         # Configure router to know how to reach Host B
         >>> router.add_route("192.168.2.20", host_b2)
         
-        # Send packet to router (not directly to Host B)
-        >>> pkt2 = Packet(IPAddress("192.168.1.10"), IPAddress("192.168.2.20"), "Via router", ttl=5)
-        >>> net2.deliver_packet(pkt2)
+        # Host sends to router (next hop), packet destination is Host B
+        >>> pkt2 = Packet(IPAddress("192.168.1.10"), IPAddress("192.168.2.20"), "Via router", ttl=10)
+        >>> net2.deliver_packet(pkt2, "192.168.1.1")
         
         # Router receives and forwards to Host B
         >>> len(host_b2.inbox)
@@ -155,22 +161,15 @@ class Network:
         >>> host_b2.inbox[0].payload
         'Via router'
         >>> pkt2.ttl
-        4
+        9
         
-        Test Case 3: Unregistered destination (packet dropped)
-        Destination IP not in network registry
+        Test Case 3: Unregistered next hop (packet dropped)
         >>> net3 = Network()
         >>> host_a3 = Host("192.168.1.10", net3)
-        >>> host_b3 = Host("192.168.1.20", net3)
         >>> net3.register_device(host_a3)
-        >>> net3.register_device(host_b3)
         
-        # Try to send to unregistered IP
-        >>> pkt3 = Packet(IPAddress("192.168.1.10"), IPAddress("8.8.8.8"), "Nowhere", ttl=5)
-        >>> initial_inbox_count = len(host_b3.inbox)
-        >>> net3.deliver_packet(pkt3)
-        >>> len(host_b3.inbox) == initial_inbox_count
-        True
+        >>> pkt3 = Packet(IPAddress("192.168.1.10"), IPAddress("8.8.8.8"), "Lost", ttl=5)
+        >>> net3.deliver_packet(pkt3, "192.168.1.1")
         
         Test Case 4: Multiple sequential packets
         Verify sequence numbers are preserved through delivery
@@ -182,20 +181,15 @@ class Network:
         
         >>> pkt_a = Packet(IPAddress("192.168.1.5"), IPAddress("192.168.1.15"), "First", ttl=10, sequence=1)
         >>> pkt_b = Packet(IPAddress("192.168.1.5"), IPAddress("192.168.1.15"), "Second", ttl=10, sequence=2)
-        >>> pkt_c = Packet(IPAddress("192.168.1.5"), IPAddress("192.168.1.15"), "Third", ttl=10, sequence=3)
-        
-        >>> net4.deliver_packet(pkt_a)
-        >>> net4.deliver_packet(pkt_b)
-        >>> net4.deliver_packet(pkt_c)
+        >>> net4.deliver_packet(pkt_a, "192.168.1.15")
+        >>> net4.deliver_packet(pkt_b, "192.168.1.15")
         
         >>> len(receiver.inbox)
-        3
+        2
         >>> receiver.inbox[0].sequence
         1
         >>> receiver.inbox[1].sequence
         2
-        >>> receiver.inbox[2].sequence
-        3
         """
         pass
 

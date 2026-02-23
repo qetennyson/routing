@@ -49,6 +49,9 @@ class IPAddress:
         True
         """
         self.octets = self._parse_ip_string(ip_string)
+        self.gateway = gateway
+
+    
 
     def _parse_ip_string(self, ip_string):
         """
@@ -90,7 +93,8 @@ class IPAddress:
 
         return octets
         
-    
+    def is_same_network(self):
+
     def is_valid(self):
         """
         Check if this IP address is valid.
@@ -242,3 +246,41 @@ class IPAddress:
         True
         """
         return self.octets == other.octets
+    
+    def is_same_network(self, other_ip):
+        """
+        Check if another IP address is on the same /24 network.
+        
+        Two IPs are on the same network if their first 3 octets match.
+        This simulates a /24 subnet mask (255.255.255.0).
+        
+        KEY NETWORKING CONCEPT:
+        Hosts use this to decide routing:
+        - Same network → send directly to destination
+        - Different network → send to gateway (router)
+        
+        Args:
+            other_ip (IPAddress): Another IP address to compare
+        
+        Returns:
+            bool: True if on same /24 network, False otherwise
+        
+        >>> ip1 = IPAddress("192.168.1.10")
+        >>> ip2 = IPAddress("192.168.1.20")
+        >>> ip1.is_same_network(ip2)
+        True
+        
+        >>> ip3 = IPAddress("192.168.2.20")
+        >>> ip1.is_same_network(ip3)
+        False
+        
+        >>> ip4 = IPAddress("10.0.0.1")
+        >>> ip5 = IPAddress("10.0.0.50")
+        >>> ip4.is_same_network(ip5)
+        True
+        
+        >>> ip6 = IPAddress("10.0.1.1")
+        >>> ip4.is_same_network(ip6)
+        False
+        """
+        pass
